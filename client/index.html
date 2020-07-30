@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotify Visualizer</title>
+
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+        integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+    <link rel="stylesheet" href="styles.css">
+
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"
+        integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.3/dist/Chart.min.js"></script>
+</head>
+
+<body>
+    <div class="main">
+        <div class="intro">
+            <h1 class="title">Spotify Data Visualizer</h1>
+            <h2 class="instructions">Use the button below to upload your files downloaded from Spotify that include your
+                streaming history.</h2>
+
+            <button type="button" class="upload-button" onclick="$('#file-input').click()">UPLOAD</button>
+
+            <form id="file-uploader" style="display: none;">
+                <input id="file-input" type="file" multiple />
+            </form>
+        </div>
+        <div class="results">
+            <h2 class="results-text"></h2>
+            <div class="chart-container">
+                <canvas id="results-chart-artists"></canvas>
+                <canvas id="results-chart-tracks" style="display: none;"></canvas>
+            </div>
+            <div class="controls">
+                <span class="switch-text">Artists</span>
+                <label class="switch">
+                    <input type="checkbox">
+                    <span class="slider round"></span>
+                </label>
+                <span class="switch-text">Songs</span>
+                <button type="button" class="upload-button"
+                    style="margin-top: 30px; margin-bottom: 0px; margin-left: 50px;"
+                    onclick="window.location.reload()">RESET</button>
+            </div>
+        </div>
+        <div class="loader">
+            <h2 class="loading-text">Computing ...</h2>
+            <div class="loader-full-bar">
+                <div class="loader-progress-bar"></div>
+            </div>
+        </div>
+        <div class="error">
+            <h2 class="error-text"></h2>
+            <button type="button" class="upload-button" style="display: block; margin: 0 auto;"
+                onclick="window.location.reload()">TRY AGAIN</button>
+        </div>
+    </div>
+
+    <script>
+        $(document).ready(() => {
+            $('#file-input').on('change', (event) => {
+                try {
+                    let files;
+                    let filesRead = 0;
+
+                    const length = event.target.files.length;
+
+                    for (let i = 0; i < length; i++) {
+                        var reader = new FileReader();
+
+                        reader.onload = (event) => {
+                            filesRead++;
+                            const json = JSON.parse(event.target.result);
+
+                            if (!files) {
+                                files = json;
+                            } else {
+                                files = files.concat(json);
+                            }
+
+                            if (filesRead === length) {
+                                computeHistory(files);
+                            }
+                        };
+
+                        reader.readAsText(event.target.files[i]);
+                    }
+                } catch (error) {
+                    console.error(error);
+                    $('.intro').fadeOut(500, () => {
+                        $('.error-text').html('There was an issue parsing your files for Spotify streaming history.  Please try again.');
+                        $('.error').fadeIn(500);
+                    });
+                }
+            });
+        });
+
+        const computeHistory = (streams) => {
+            $('.intro').fadeOut(500, () => {
+                $('.loader').fadeIn(500, () => {
+                    try {
+                        const length = streams.length - 1;
+                        const progressBar = $('.loader-progress-bar');
+
+                        let artistMap = new Map();
+                        let trackMap = new Map();
+
+                        let minDate = new Date(streams[0].endTime);
+                        let maxDate = new Date(streams[0].endTime);
+
+                        streams.forEach((stream, index) => {
+                            const artist = stream.artistName;
+                            const track = stream.trackName;
+                            const minutesPlayed = (stream.msPlayed / 60000).toFixed(2);
+
+                            let currentArtist = artistMap.get(artist) || 0;
+                            let currentTrack = trackMap.get(track) || 0;
+
+                            artistMap.set(artist, parseFloat(currentArtist) + parseFloat(minutesPlayed));
+                            trackMap.set(track, parseFloat(currentTrack) + parseFloat(minutesPlayed));
+
+                            const endTime = new Date(stream.endTime);
+
+                            if (endTime < minDate) minDate = endTime;
+                            if (endTime > maxDate) maxDate = endTime;
+
+                            const progress = ((index / length) * 100).toFixed(0);
+                            progressBar.width(`${progress}%`);
+                        });
+
+                        const sortedArtistMap = new Map([...artistMap.entries()].sort((a, b) => b[1] - a[1]));
+                        const sortedTrackMap = new Map([...trackMap.entries()].sort((a, b) => b[1] - a[1]));
+
+                        let top10Artists = [];
+
+                        let i = 0;
+                        for (let entry of sortedArtistMap.entries()) {
+                            i++;
+                            if (i <= 10) {
+                                top10Artists.push({
+                                    artist: entry[0],
+                                    minutes: entry[1]
+                                });
+                            } else {
+                                break;
+                            }
+                        }
+
+                        let top10Tracks = [];
+
+                        i = 0;
+                        for (let entry of sortedTrackMap.entries()) {
+                            i++;
+                            if (i <= 10) {
+                                top10Tracks.push({
+                                    track: entry[0],
+                                    minutes: entry[1]
+                                });
+                            } else {
+                                break;
+                            }
+                        }
+
+                        $('.loader').fadeOut(1000, () => {
+                            displayResults(top10Artists, top10Tracks, minDate, maxDate);
+                        });
+                    } catch (error) {
+                        console.error(error);
+                        $('.loader').fadeOut(500, () => {
+                            $('.error-text').html('There was an issue parsing your files for Spotify streaming history.  Please try again.');
+                            $('.error').fadeIn(500);
+                        });
+                    }
+                });
+            });
+        };
+
+        const displayResults = (top10Artists, top10Tracks, start, end) => {
+            Chart.defaults.global.defaultFontColor = 'white';
+            Chart.defaults.global.defaultFontFamily = 'Source Sans Pro';
+            Chart.defaults.global.defaultFontSize = 20;
+            Chart.defaults.global.defaultFontStyle = 'lighter';
+
+            $('.results-text').html(`Results (${start.toLocaleDateString()} - ${end.toLocaleDateString()})`);
+
+            $('.results').fadeIn(1000, () => {
+                const artistsChart = new Chart(document.getElementById('results-chart-artists').getContext('2d'), {
+                    type: 'horizontalBar',
+                    data: {
+                        labels: top10Artists.map(entry => entry.artist),
+                        datasets: [{
+                            label: 'Minutes Listened',
+                            data: top10Artists.map(entry => entry.minutes.toFixed(0)),
+                            backgroundColor: [
+                                'rgb(27, 216, 96, 0.2)',
+                                'rgb(27, 216, 96, 0.2)',
+                                'rgb(27, 216, 96, 0.2)',
+                                'rgb(27, 216, 96, 0.2)',
+                                'rgb(27, 216, 96, 0.2)',
+                                'rgb(27, 216, 96, 0.2)',
+                                'rgb(27, 216, 96, 0.2)',
+                                'rgb(27, 216, 96, 0.2)',
+                                'rgb(27, 216, 96, 0.2)',
+                                'rgb(27, 216, 96, 0.2)'
+                            ],
+                            borderColor: [
+                                'rgba(27, 216, 96, 1)',
+                                'rgba(27, 216, 96, 1)',
+                                'rgba(27, 216, 96, 1)',
+                                'rgba(27, 216, 96, 1)',
+                                'rgba(27, 216, 96, 1)',
+                                'rgba(27, 216, 96, 1)',
+                                'rgba(27, 216, 96, 1)',
+                                'rgba(27, 216, 96, 1)',
+                                'rgba(27, 216, 96, 1)',
+                                'rgba(27, 216, 96, 1)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        maintainAspectRatio: false,
+                        responsive: true
+                    }
+                });
+
+                const tracksChart = new Chart(document.getElementById('results-chart-tracks').getContext('2d'), {
+                    type: 'horizontalBar',
+                    data: {
+                        labels: top10Tracks.map(entry => entry.track),
+                        datasets: [{
+                            label: 'Minutes Listened',
+                            data: top10Tracks.map(entry => entry.minutes.toFixed(0)),
+                            backgroundColor: [
+                                'rgb(33, 150, 243, 0.2)',
+                                'rgb(33, 150, 243, 0.2)',
+                                'rgb(33, 150, 243, 0.2)',
+                                'rgb(33, 150, 243, 0.2)',
+                                'rgb(33, 150, 243, 0.2)',
+                                'rgb(33, 150, 243, 0.2)',
+                                'rgb(33, 150, 243, 0.2)',
+                                'rgb(33, 150, 243, 0.2)',
+                                'rgb(33, 150, 243, 0.2)',
+                                'rgb(33, 150, 243, 0.2)'
+                            ],
+                            borderColor: [
+                                'rgba(33, 150, 243, 1)',
+                                'rgba(33, 150, 243, 1)',
+                                'rgba(33, 150, 243, 1)',
+                                'rgba(33, 150, 243, 1)',
+                                'rgba(33, 150, 243, 1)',
+                                'rgba(33, 150, 243, 1)',
+                                'rgba(33, 150, 243, 1)',
+                                'rgba(33, 150, 243, 1)',
+                                'rgba(33, 150, 243, 1)',
+                                'rgba(33, 150, 243, 1)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        maintainAspectRatio: false,
+                        responsive: true
+                    }
+                });
+            });
+
+            $('.switch input').on('change', () => {
+                if ($('#results-chart-artists').css('display') === 'none') {
+                    $('#results-chart-tracks').fadeToggle(250, () => {
+                        $('#results-chart-artists').fadeToggle(250);
+                    });
+                } else {
+                    $('#results-chart-artists').fadeToggle(250, () => {
+                        $('#results-chart-tracks').fadeToggle(250);
+                    });
+                }
+            });
+        };
+    </script>
+</body>
+
+</html>
