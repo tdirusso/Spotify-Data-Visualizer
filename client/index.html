@@ -272,13 +272,11 @@
 
             $('.switch input').on('change', () => {
                 if ($('#results-chart-artists').css('display') === 'none') {
-                    $('#results-chart-tracks').fadeToggle(250, () => {
-                        $('#results-chart-artists').fadeToggle(250);
-                    });
+                    $('#results-chart-tracks').toggle();
+                    $('#results-chart-artists').toggle();
                 } else {
-                    $('#results-chart-artists').fadeToggle(250, () => {
-                        $('#results-chart-tracks').fadeToggle(250);
-                    });
+                    $('#results-chart-artists').toggle();
+                    $('#results-chart-tracks').toggle();
                 }
             });
         };
