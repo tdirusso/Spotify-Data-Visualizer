@@ -1,0 +1,23 @@
+{
+  "name": "spotify-data-visualizer",
+  "version": "1.0.0",
+  "description": "View your top songs & artists from Spotify's downloadable streaming data.",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "npm install && node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tdirusso/Spotify-Data-Visualizer.git"
+  },
+  "author": "Tim DiRusso",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/tdirusso/Spotify-Data-Visualizer/issues"
+  },
+  "homepage": "https://github.com/tdirusso/Spotify-Data-Visualizer#readme",
+  "dependencies": {
+    "express": "^4.17.1"
+  }
+}
